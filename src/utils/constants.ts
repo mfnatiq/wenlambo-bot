@@ -1,3 +1,3 @@
-export const maxNumPlots = 21000;
-export const minNumPlots = 1;
-export const batchSizePlots = 100;
+export const maxLamboMintId = 9999;
+export const minLamboMintId = 0;
+export const batchSizeLambos = 100;

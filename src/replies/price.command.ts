@@ -1,18 +1,23 @@
 import Web3 from 'web3';
 import {
-  MarsColonyNFT,
+  WenLamboNFT,
   NFTKeysMarketplaceAddress,
   GM,
-  CLNY_LiquidityMining,
+  HVILLE,
+  garageContract,
 } from '../values';
-import LiquidityMining from '../resources/LiquidityMining.json';
 import NFTKeyMarketplaceABI from '../resources/NFTKeyMarketplaceABI.json'; // from https://nftkey.app/marketplace-contracts/, see BSC / FTM / AVAX explorer for ABI
-import GameManager from '../resources/GameManager.json';
-import MarsColony from '../resources/MC.json';
+import garagemanager from '../resources/garagemanager.json';
+// import MarsColony from '../resources/MC.json';
 import { AbiItem } from 'web3-utils';
 import { escapeBrackets, escapeDot } from '../utils/utils';
-import { minNumPlots, maxNumPlots, batchSizePlots } from '../utils/constants';
+import {
+  minLamboMintId,
+  maxLamboMintId,
+  batchSizeLambos,
+} from '../utils/constants';
 import { AttributeData } from '../types';
+import axios from 'axios';
 
 const web3 = new Web3('https://api.harmony.one');
 const nftkeysMarketplaceContract = new web3.eth.Contract(
@@ -20,14 +25,9 @@ const nftkeysMarketplaceContract = new web3.eth.Contract(
   NFTKeysMarketplaceAddress
 );
 
-const clnyLiquidityMining = new web3.eth.Contract(
-  LiquidityMining.abi as AbiItem[],
-  CLNY_LiquidityMining
-);
+const gm = new web3.eth.Contract(garagemanager as AbiItem[], garageContract);
 
-const gm = new web3.eth.Contract(GameManager.abi as AbiItem[], GM);
-
-const mc = new web3.eth.Contract(MarsColony.abi as AbiItem[], MarsColonyNFT);
+// const mc = new web3.eth.Contract(MarsColony.abi as AbiItem[], WenLamboNFT);
 
 interface Listing {
   tokenId: number;
@@ -37,10 +37,9 @@ interface Listing {
 }
 
 // global variables for caching
-export let priceCLNYperONE = 0;
+export let priceHVILLEperONE = 0;
 export let priceONEperUSD = 0;
-export let priceCLNYperUSD = 0;
-export let priceSLPperUSD = 0;
+export let priceHVILLEperUSD = 0;
 
 let currBlockNumCached = 0;
 export let totalTransactionValueCached = 0;
@@ -70,16 +69,20 @@ interface TokenBoughtListing {
 (async () => {
   while (true) {
     try {
-      const clnyPrices = await clnyLiquidityMining.methods
-        .getClnyPrice()
-        .call();
-
-      priceCLNYperONE = clnyPrices[0] * 1e-18;
-      priceONEperUSD =
-        (await clnyLiquidityMining.methods.getOnePrice().call()) * 1e-18;
-      priceCLNYperUSD = clnyPrices[1] * 1e-36;
-      priceSLPperUSD =
-        (await clnyLiquidityMining.methods.getSLPPrice().call()) * 1e-18;
+      axios
+        .all([
+          axios.get(
+            'https://api.coingecko.com/api/v3/simple/price?ids=harmony&vs_currencies=usd'
+          ),
+          axios.get(
+            'https://api.coingecko.com/api/v3/simple/price?ids=harmonyville&vs_currencies=usd'
+          ),
+        ])
+        .then((respArr) => {
+          priceONEperUSD = respArr[0].data['harmony']['usd'];
+          priceHVILLEperUSD = respArr[1].data['harmonyville']['usd'];
+          priceHVILLEperONE = priceHVILLEperUSD / priceONEperUSD;
+        });
     } catch (error) {
       console.log('pricing error', error);
     }
@@ -95,20 +98,27 @@ interface TokenBoughtListing {
     try {
       const earningSpeedsArrTemp: PlotEarning[] = [];
 
-      // all plots
+      // all lambos
       for (
-        let currIdx = minNumPlots;
-        currIdx < maxNumPlots;
-        currIdx += batchSizePlots
+        let currIdx = minLamboMintId;
+        currIdx < maxLamboMintId;
+        currIdx += batchSizeLambos
       ) {
         const nftDataAll: AttributeData[] = await gm.methods
-          .getAttributesMany(
-            Array.from({ length: batchSizePlots }, (_, i) => i + currIdx)
+          .getTokenAttributesMany(
+            Array.from({ length: batchSizeLambos }, (_, i) => i + currIdx)
           )
           .call();
 
-        for (const nftData of nftDataAll) {
-          const earningSpeed = nftData.speed;
+        for (let [nftDataIdx, nftData] of nftDataAll.entries()) {
+          let earningSpeed = nftData.speed;
+
+          while (earningSpeed < 1 || earningSpeed > 30) {
+            nftData = await gm.methods
+              .getTokenAttributes(nftDataIdx + currIdx)
+              .call();
+            earningSpeed = nftData.speed;
+          }
 
           const idx = earningSpeedsArrTemp.findIndex(
             (e) => e.earningSpeed === earningSpeed
@@ -129,19 +139,19 @@ interface TokenBoughtListing {
         }
       }
 
-      // plots for sale
+      // lambos for sale
       const numListings: number = await nftkeysMarketplaceContract.methods
-        .numTokenListings(MarsColonyNFT)
+        .numTokenListings(WenLamboNFT)
         .call();
 
       let currBatchCount = 0;
-      let startingIdx = 1 + currBatchCount * batchSizePlots;
+      let startingIdx = 1 + currBatchCount * batchSizeLambos;
 
       while (startingIdx <= numListings) {
         try {
           const tokenListings: Listing[] =
             await nftkeysMarketplaceContract.methods
-              .getTokenListings(MarsColonyNFT, startingIdx, batchSizePlots)
+              .getTokenListings(WenLamboNFT, startingIdx, batchSizeLambos)
               .call();
 
           // value 0 = not listed
@@ -150,7 +160,7 @@ interface TokenBoughtListing {
           );
 
           const nftData: AttributeData[] = await gm.methods
-            .getAttributesMany(tokenListingsListed.map((t) => t.tokenId))
+            .getTokenAttributesMany(tokenListingsListed.map((t) => t.tokenId))
             .call();
 
           for (const i in tokenListingsListed) {
@@ -176,7 +186,8 @@ interface TokenBoughtListing {
           }
 
           currBatchCount++;
-          startingIdx = 1 + currBatchCount * batchSizePlots;
+          startingIdx = 1 + currBatchCount * batchSizeLambos;
+          console.log('earningSpeedsArrTemp:', earningSpeedsArrTemp);
         } catch (error) {
           console.log(error);
           await new Promise((resolve) => setTimeout(resolve, 1000)); // wait before retry if looping through listings fails
@@ -203,13 +214,13 @@ interface TokenBoughtListing {
       const latestBlockNum = await web3.eth.getBlockNumber();
 
       // let currBlockNum = 20758264; // https://nftkey.app/marketplace-contracts/ -> Harmony Blockchain -> Transaction Hash -> Block Number
-      // let currBlockNum = 21413624; // through testing of very first transaction
+      // let currBlockNum = 22287096; // manual testing of approximate block number of first transaction
 
       // for caching purposes
       // TODO store this in db / json file
-      let currBlockNum = 23008183;
-      let totalTransactionValue = 22669699.043509007;
-      let numSold = 8738;
+      let currBlockNum = 25437465;
+      let totalTransactionValue = 7414751.450031001;
+      let numSold = 5404;
 
       while (currBlockNum < latestBlockNum) {
         const toBlock = Math.min(
@@ -224,7 +235,7 @@ interface TokenBoughtListing {
             toBlock: toBlock,
             address: NFTKeysMarketplaceAddress,
             filter: {
-              erc721Address: MarsColonyNFT,
+              erc721Address: WenLamboNFT,
             },
           }
         );
@@ -235,7 +246,7 @@ interface TokenBoughtListing {
           );
           const tokensPricesBought = tokensBoughtData.map((t) => {
             const tokenId = Number(t.tokenId);
-            if (tokenId > 21000 || tokenId < 1) {
+            if (tokenId > maxLamboMintId || tokenId < minLamboMintId) {
               console.log('ERROR:', t.tokenId, Number(t.value) / divideConst);
               return 0;
             }
@@ -257,13 +268,19 @@ interface TokenBoughtListing {
       totalTransactionValueCached = totalTransactionValue;
       numSoldCached = numSold;
 
+      console.log('----------------------');
+      console.log(
+        'NFTKEY TRANSACTIONS:',
+        currBlockNumCached,
+        totalTransactionValueCached,
+        numSoldCached
+      );
+
       await new Promise((resolve) =>
         setTimeout(resolve, 1000 * 60 * numMinutesCache)
       );
     } catch {
-      await new Promise((resolve) =>
-        setTimeout(resolve, 1000 * 10)
-      );
+      await new Promise((resolve) => setTimeout(resolve, 1000 * 10));
     }
   }
 })();
@@ -275,10 +292,9 @@ export const getPrice = async (
   try {
     const priceResponse = `
 1 ONE \\= **$${escapeDot(priceONEperUSD.toFixed(3))}**
-1 CLNY \\= **$${escapeDot(priceCLNYperUSD.toFixed(3))}** \\= **${escapeDot(
-      priceCLNYperONE.toFixed(3)
+1 HVILLE \\= **$${escapeDot(priceHVILLEperUSD.toFixed(3))}** \\= **${escapeDot(
+      priceHVILLEperONE.toFixed(3)
     )} ONE**
-1 SLP \\~ **$${escapeDot(priceSLPperUSD.toFixed(3))}**
     `.trim();
 
     let earningSpeedResponse = '';
@@ -289,7 +305,7 @@ export const getPrice = async (
           .sort((a, b) => a.earningSpeed - b.earningSpeed)
           .map(
             (e) =>
-              `**${e.earningSpeed}** CLNY/day: **${e.count}** plots${
+              `**${e.earningSpeed}** HVILLE/day: **${e.count}** lambos${
                 e.countListed > 0
                   ? ` (**${
                       e.countListed
@@ -298,8 +314,8 @@ export const getPrice = async (
                     )}** ONE \\= $${(priceONEperUSD * e.floorPrice).toFixed(
                       0
                     )} \\= ${escapeDot(
-                      (e.floorPrice / priceCLNYperONE).toFixed(0)
-                    )} CLNY)`
+                      (e.floorPrice / priceHVILLEperONE).toFixed(0)
+                    )} HVILLE)`
                   : ''
               }`
           )
