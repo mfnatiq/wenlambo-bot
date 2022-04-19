@@ -1,21 +1,10 @@
 import Web3 from 'web3';
-import {
-  CLNY as CLNYAddress,
-  CLNY_LIQUIDITY,
-  CLNY_LIQUIDITY_BUFFER,
-  CLNY_TREASURY,
-  // GM,
-} from '../values';
 // import CLNY from '../resources/CLNY.json';
 import { AbiItem } from 'web3-utils';
-import { escapeDot, numberWithCommas } from '../utils/utils';
+import { numberWithCommas } from '../utils/utils';
 import { numMinutesCache } from './price.command';
 // import GameManager from '../resources/GameManager.json';
-import {
-  minLamboMintId,
-  maxLamboMintId,
-  batchSizeLambos,
-} from '../utils/constants';
+import { maxLamboMintId, batchSizeLambos } from '../utils/constants';
 import { AttributeData } from '../types';
 
 const web3 = new Web3('https://api.harmony.one');
@@ -102,7 +91,7 @@ let totalClnyBurned = 0;
 //   }
 // })();
 
-// export const getCLNYStats = async (footer?: any): Promise<string> => {
+// export const getCLNYStats = async (): Promise<string> => {
 //   try {
 //     const clnyTotalSupply = (await clny.methods.totalSupply().call()) * factor;
 
@@ -131,15 +120,10 @@ let totalClnyBurned = 0;
 // CLNY burned through land upgrades: **${numberWithCommas(
 //             escapeDot(totalClnyBurned.toFixed(0))
 //           )}**`
-//         : '') +
-//       (footer
-//         ? `
-// ${footer}
-// `
 //         : '')
 //     ).trim();
 //   } catch (error) {
 //     console.log(error);
-//     return 'Fetching CLNY statistics...\n\n' + footer;
+//     return 'Fetching CLNY statistics...';
 //   }
 // };

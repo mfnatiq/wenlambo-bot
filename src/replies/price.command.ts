@@ -2,20 +2,14 @@ import Web3 from 'web3';
 import {
   WenLamboNFT,
   NFTKeysMarketplaceAddress,
-  GM,
-  HVILLE,
   garageContract,
+  harmonyChainId,
 } from '../values';
 import NFTKeyMarketplaceABI from '../resources/NFTKeyMarketplaceABI.json'; // from https://nftkey.app/marketplace-contracts/, see BSC / FTM / AVAX explorer for ABI
 import garagemanager from '../resources/garagemanager.json';
-// import MarsColony from '../resources/MC.json';
 import { AbiItem } from 'web3-utils';
-import { escapeBrackets, escapeDot } from '../utils/utils';
-import {
-  minLamboMintId,
-  maxLamboMintId,
-  batchSizeLambos,
-} from '../utils/constants';
+import { numberWithCommas } from '../utils/utils';
+import { maxLamboMintId, batchSizeLambos } from '../utils/constants';
 import { AttributeData } from '../types';
 import axios from 'axios';
 
@@ -26,8 +20,6 @@ const nftkeysMarketplaceContract = new web3.eth.Contract(
 );
 
 const gm = new web3.eth.Contract(garagemanager as AbiItem[], garageContract);
-
-// const mc = new web3.eth.Contract(MarsColony.abi as AbiItem[], WenLamboNFT);
 
 interface Listing {
   tokenId: number;
@@ -41,13 +33,17 @@ export let priceHVILLEperONE = 0;
 export let priceONEperUSD = 0;
 export let priceHVILLEperUSD = 0;
 
-let currBlockNumCached = 0;
-export let totalTransactionValueCached = 0;
+export let totalTransactionValueUsdCached = 0;
+export let totalTransactionValueOneCached = 0;
+export let transactionValue7dUsdCached = 0;
+export let transactionValue7dOneCached = 0;
+export let transactionValue30dUsdCached = 0;
+export let transactionValue30dOneCached = 0;
 export let numSoldCached = 0;
+export let avgPriceSoldOneCached = 0;
 
-export const numMinutesCache = 2;
+export const numMinutesCache = 1;
 const divideConst = 1e18;
-const listingsBatchSize = 1024;
 
 export interface PlotEarning {
   count: number;
@@ -57,13 +53,6 @@ export interface PlotEarning {
 }
 
 export let earningSpeedsArr: PlotEarning[] = [];
-
-interface TokenBoughtListing {
-  tokenId: string;
-  value: string;
-  seller: string;
-  expireTimestamp: number;
-}
 
 // cache every numMinutesCache in background (not upon query)
 (async () => {
@@ -100,42 +89,38 @@ interface TokenBoughtListing {
 
       // all lambos
       for (
-        let currIdx = minLamboMintId;
-        currIdx < maxLamboMintId;
-        currIdx += batchSizeLambos
+        let earningSpeedParam = 1;
+        earningSpeedParam <= 30;
+        earningSpeedParam++
       ) {
-        const nftDataAll: AttributeData[] = await gm.methods
-          .getTokenAttributesMany(
-            Array.from({ length: batchSizeLambos }, (_, i) => i + currIdx)
-          )
-          .call();
+        const res = await axios.post('https://nftkey.app/graphql', {
+          operationName: 'GetERC721TokenCountNew',
+          variables: {
+            input: {
+              collectionId: `${WenLamboNFT}_${harmonyChainId}`,
+              filters: {
+                traits: [{ type: 'Speed', values: [`${earningSpeedParam}`] }],
+              },
+              pageSize: maxLamboMintId + 1,
+            },
+          },
+          query:
+            'query GetERC721TokenCountNew($input: GetERC721TokensByCollectionIdInput!) {\n  erc721Tokens(input: $input) {\n    count\n    tokens {\n      tokenId\n      __typename\n    }\n    __typename\n  }\n}\n',
+        });
 
-        for (let [nftDataIdx, nftData] of nftDataAll.entries()) {
-          let earningSpeed = nftData.speed;
-
-          while (earningSpeed < 1 || earningSpeed > 30) {
-            nftData = await gm.methods
-              .getTokenAttributes(nftDataIdx + currIdx)
-              .call();
-            earningSpeed = nftData.speed;
-          }
-
-          const idx = earningSpeedsArrTemp.findIndex(
-            (e) => e.earningSpeed === earningSpeed
-          );
-          if (idx > -1) {
-            earningSpeedsArrTemp[idx] = {
-              ...earningSpeedsArrTemp[idx],
-              count: earningSpeedsArrTemp[idx].count + 1,
-            };
-          } else {
-            earningSpeedsArrTemp.push({
-              earningSpeed: earningSpeed,
-              count: 1,
-              countListed: 0,
-              floorPrice: 0,
-            });
-          }
+        const respData = await res.data;
+        if (
+          respData['data'] &&
+          respData['data']['erc721Tokens'] &&
+          respData['data']['erc721Tokens']['count'] &&
+          respData['data']['erc721Tokens']['count'] > 0
+        ) {
+          earningSpeedsArrTemp.push({
+            earningSpeed: earningSpeedParam,
+            count: respData['data']['erc721Tokens']['count'],
+            countListed: 0,
+            floorPrice: 0,
+          });
         }
       }
 
@@ -156,23 +141,24 @@ interface TokenBoughtListing {
 
           // value 0 = not listed
           const tokenListingsListed = tokenListings.filter(
-            (t) => t.value / divideConst !== 0
+            (t) => t.value !== 0
           );
-
-          const nftData: AttributeData[] = await gm.methods
-            .getTokenAttributesMany(tokenListingsListed.map((t) => t.tokenId))
-            .call();
 
           for (const i in tokenListingsListed) {
             const t = tokenListingsListed[i];
             const price = t.value / divideConst;
 
-            const earningSpeed = nftData[i].speed;
-
             if (price !== 0) {
+              // TODO find more optimised way?
+              const nftData: AttributeData = await gm.methods
+                .getTokenAttributes(t.tokenId)
+                .call();
+              const earningSpeed = nftData.speed;
+
               const idx = earningSpeedsArrTemp.findIndex(
-                (e) => e.earningSpeed === earningSpeed
+                (e) => e.earningSpeed - earningSpeed === 0
               );
+
               if (idx > -1) {
                 const e = earningSpeedsArrTemp[idx];
                 earningSpeedsArrTemp[idx] = {
@@ -187,18 +173,18 @@ interface TokenBoughtListing {
 
           currBatchCount++;
           startingIdx = 1 + currBatchCount * batchSizeLambos;
-          console.log('earningSpeedsArrTemp:', earningSpeedsArrTemp);
         } catch (error) {
           console.log(error);
           await new Promise((resolve) => setTimeout(resolve, 1000)); // wait before retry if looping through listings fails
           continue;
         }
       }
+
       earningSpeedsArr = earningSpeedsArrTemp;
     } catch (error) {
       // should not have error unless numTokenListings has error
       // any getTokenListings errors should be caught within inner try/catch
-      console.log('nft pricing error', error);
+      console.log('nft token listings error', error);
     }
 
     await new Promise((resolve) =>
@@ -211,70 +197,31 @@ interface TokenBoughtListing {
   while (true) {
     try {
       // getting total sales
-      const latestBlockNum = await web3.eth.getBlockNumber();
+      const res = await axios.post('https://nftkey.app/graphql', {
+        operationName: 'ERC721TradingHistory',
+        variables: {
+          id: `${WenLamboNFT}_${harmonyChainId}`,
+        },
+        query:
+          'query ERC721TradingHistory($id: ID!) {\n  erc721TradingHistoryById(id: $id) {\n    id\n    lastUpdatedTimestamp\n    totalVolume\n    last7DVolume\n    last30DVolume\n    totalVolumeUsd\n    last7DVolumeUsd\n    last30DVolumeUsd\n    totalSalesCount\n    avgPrice\n    dailyVolume {\n      startTime\n      avgPrice\n      volume\n      count\n      __typename\n    }\n    __typename\n  }\n}\n',
+      });
+      const respData = await res.data;
+      if (
+        respData &&
+        respData['data'] &&
+        respData['data']['erc721TradingHistoryById']
+      ) {
+        const data = respData['data']['erc721TradingHistoryById'];
 
-      // let currBlockNum = 20758264; // https://nftkey.app/marketplace-contracts/ -> Harmony Blockchain -> Transaction Hash -> Block Number
-      // let currBlockNum = 22287096; // manual testing of approximate block number of first transaction
-
-      // for caching purposes
-      // TODO store this in db / json file
-      let currBlockNum = 25437465;
-      let totalTransactionValue = 7414751.450031001;
-      let numSold = 5404;
-
-      while (currBlockNum < latestBlockNum) {
-        const toBlock = Math.min(
-          currBlockNum + listingsBatchSize - 1,
-          latestBlockNum
-        );
-
-        const events = await nftkeysMarketplaceContract.getPastEvents(
-          'TokenBought',
-          {
-            fromBlock: currBlockNum,
-            toBlock: toBlock,
-            address: NFTKeysMarketplaceAddress,
-            filter: {
-              erc721Address: WenLamboNFT,
-            },
-          }
-        );
-
-        if (events && events.length > 0) {
-          const tokensBoughtData = events.map(
-            (e) => e.returnValues.listing as TokenBoughtListing
-          );
-          const tokensPricesBought = tokensBoughtData.map((t) => {
-            const tokenId = Number(t.tokenId);
-            if (tokenId > maxLamboMintId || tokenId < minLamboMintId) {
-              console.log('ERROR:', t.tokenId, Number(t.value) / divideConst);
-              return 0;
-            }
-            return Number(t.value) / divideConst;
-          });
-
-          for (const t of tokensPricesBought) {
-            if (t > 0) {
-              numSold++;
-              totalTransactionValue += t;
-            }
-          }
-        }
-
-        currBlockNum = toBlock + 1;
+        totalTransactionValueUsdCached = data['totalVolumeUsd'];
+        totalTransactionValueOneCached = data['totalVolume'];
+        transactionValue7dUsdCached = data['last7DVolumeUsd'];
+        transactionValue7dOneCached = data['last7DVolume'];
+        transactionValue30dUsdCached = data['last30DVolumeUsd'];
+        transactionValue30dOneCached = data['last30DVolume'];
+        numSoldCached = data['totalSalesCount'];
+        avgPriceSoldOneCached = data['avgPrice'];
       }
-
-      currBlockNumCached = currBlockNum;
-      totalTransactionValueCached = totalTransactionValue;
-      numSoldCached = numSold;
-
-      console.log('----------------------');
-      console.log(
-        'NFTKEY TRANSACTIONS:',
-        currBlockNumCached,
-        totalTransactionValueCached,
-        numSoldCached
-      );
 
       await new Promise((resolve) =>
         setTimeout(resolve, 1000 * 60 * numMinutesCache)
@@ -285,80 +232,72 @@ interface TokenBoughtListing {
   }
 })();
 
-export const getPrice = async (
-  footer?: any,
-  includeDexscreener?: boolean
-): Promise<string> => {
+export const getPrice = async (): Promise<string> => {
   try {
     const priceResponse = `
-1 ONE \\= **$${escapeDot(priceONEperUSD.toFixed(3))}**
-1 HVILLE \\= **$${escapeDot(priceHVILLEperUSD.toFixed(3))}** \\= **${escapeDot(
-      priceHVILLEperONE.toFixed(3)
-    )} ONE**
+1 ONE \\= **$${priceONEperUSD.toFixed(3)}**
+1 HVILLE \\= **$${priceHVILLEperUSD.toFixed(
+      3
+    )}** \\= **${priceHVILLEperONE.toFixed(3)} ONE**
     `.trim();
 
     let earningSpeedResponse = '';
     if (earningSpeedsArr.length > 0) {
-      earningSpeedResponse =
-        'Listings from NFTKey\n' +
-        earningSpeedsArr
-          .sort((a, b) => a.earningSpeed - b.earningSpeed)
-          .map(
-            (e) =>
-              `**${e.earningSpeed}** HVILLE/day: **${e.count}** lambos${
-                e.countListed > 0
-                  ? ` (**${
-                      e.countListed
-                    }** listed, floor price **${e.floorPrice.toFixed(
-                      0
-                    )}** ONE \\= $${(priceONEperUSD * e.floorPrice).toFixed(
-                      0
-                    )} \\= ${escapeDot(
-                      (e.floorPrice / priceHVILLEperONE).toFixed(0)
-                    )} HVILLE)`
-                  : ''
-              }`
-          )
-          .join('\n');
+      earningSpeedResponse = earningSpeedsArr
+        .sort((a, b) => a.earningSpeed - b.earningSpeed)
+        .map(
+          (e) =>
+            `**${e.earningSpeed}** HVILLE/day: **${e.count}** lambos${
+              e.countListed > 0
+                ? ` (**${
+                    e.countListed
+                  }** listed, floor price **${e.floorPrice.toFixed(
+                    0
+                  )}** ONE \\= $${(priceONEperUSD * e.floorPrice).toFixed(
+                    0
+                  )} \\= ${(e.floorPrice / priceHVILLEperONE).toFixed(
+                    0
+                  )} HVILLE)`
+                : ''
+            }`
+        )
+        .join('\n');
     }
 
     let totalTransactionsResponse = '';
     if (
-      currBlockNumCached > 0 &&
-      totalTransactionValueCached > 0 &&
-      numSoldCached > 0
+      totalTransactionValueUsdCached > 0 &&
+      totalTransactionValueOneCached > 0 &&
+      transactionValue7dUsdCached > 0 &&
+      transactionValue7dOneCached > 0 &&
+      transactionValue30dUsdCached > 0 &&
+      transactionValue30dOneCached > 0 &&
+      numSoldCached > 0 &&
+      avgPriceSoldOneCached > 0
     ) {
-      totalTransactionsResponse = `Total Volume Traded: **${escapeDot(
-        (totalTransactionValueCached / 1e6).toFixed(1)
-      )}m** ONE
-Total Sold: **${numSoldCached}**
+      totalTransactionsResponse = `Total Volume Traded: **${numberWithCommas(
+        (totalTransactionValueOneCached / 1e6).toFixed(1)
+      )}m** ONE = $${(totalTransactionValueUsdCached / 1e6).toFixed(1)}m
+7D Volume: **${numberWithCommas(
+        (transactionValue7dOneCached / 1e3).toFixed(1)
+      )}k** ONE = $${(transactionValue7dUsdCached / 1e3).toFixed(1)}K
+30D Volume: **${numberWithCommas(
+        (transactionValue30dOneCached / 1e3).toFixed(1)
+      )}k** ONE = $${(transactionValue30dUsdCached / 1e3).toFixed(1)}K
+      Average Price Sold: **${avgPriceSoldOneCached.toFixed(2)}** ONE
+Total Sold: **${numberWithCommas(numSoldCached.toString())}**
         `;
     }
 
-    const response = escapeBrackets(
-      `
+    const response = `
 ${priceResponse}
 
 ${earningSpeedResponse}
 
-${totalTransactionsResponse}` +
-        (footer
-          ? `
-${footer}
-`
-          : '')
-    ).trim();
+${totalTransactionsResponse}`.trim();
 
-    if (includeDexscreener) {
-      return (
-        `[Dexscreener](https:\\/\\/dexscreener\\.com\\/harmony\\/0xcd818813f038a4d1a27c84d24d74bbc21551fa83)` +
-        '\n' +
-        response
-      );
-    } else {
-      return response;
-    }
+    return response;
   } catch {
-    return 'Fetching prices...' + footer ? '\n\n' + footer : '';
+    return 'Fetching prices...';
   }
 };

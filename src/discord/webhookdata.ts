@@ -1,5 +1,6 @@
 import { Client, ColorResolvable, MessageEmbed } from 'discord.js';
 import {
+  avgPriceSoldOneCached,
   earningSpeedsArr,
   getPrice,
   numMinutesCache,
@@ -7,7 +8,12 @@ import {
   priceHVILLEperONE,
   priceHVILLEperUSD,
   priceONEperUSD,
-  totalTransactionValueCached,
+  totalTransactionValueUsdCached,
+  totalTransactionValueOneCached,
+  transactionValue30dUsdCached,
+  transactionValue30dOneCached,
+  transactionValue7dUsdCached,
+  transactionValue7dOneCached,
 } from '../replies/price.command';
 // import { getCLNYStats } from '../replies/stats.command';
 import {
@@ -36,9 +42,9 @@ const sectionsData: SectionData[] = [
     authorName: 'Token Prices',
   },
   {
-    colour: '#774455',
-    authorIconUrl: 'https://meta.marscolony.io/1.png',
-    authorName: 'Lambos Data',
+    colour: '#f6c83a',
+    authorIconUrl: 'https://app.wenlambo.one/images/logo.png',
+    authorName: 'Lambos Data (~2min delayed)',
   },
   {
     colour: '#ffffff',
@@ -50,7 +56,7 @@ const sectionsData: SectionData[] = [
     colour: '#e42d06',
     authorIconUrl:
       'https://aws1.discourse-cdn.com/standard17/uploads/marscolony/original/1X/73f77e8e1a03287b99217692129344d4441f8bf3.png',
-    authorName: 'CLNY Statistics',
+    authorName: 'HVILLE Statistics',
   },
 ];
 
@@ -109,7 +115,7 @@ const getEmbedMessage = async (): Promise<MessageEmbed[]> => {
 
   const priceDataSections = priceData.split('\n\n');
 
-  return [
+  const messages = [
     new MessageEmbed()
       .setDescription(
         priceHVILLEperONE === 0 ||
@@ -137,8 +143,14 @@ const getEmbedMessage = async (): Promise<MessageEmbed[]> => {
 
     new MessageEmbed()
       .setDescription(
-        (totalTransactionValueCached > 0 &&
+        (totalTransactionValueUsdCached > 0 &&
+          totalTransactionValueOneCached > 0 &&
+          transactionValue7dUsdCached > 0 &&
+          transactionValue7dOneCached > 0 &&
+          transactionValue30dUsdCached > 0 &&
+          transactionValue30dOneCached > 0 &&
           numSoldCached > 0 &&
+          avgPriceSoldOneCached > 0 &&
           priceDataSections[2]) ||
           'Fetching transactions data...'
       )
@@ -147,13 +159,19 @@ const getEmbedMessage = async (): Promise<MessageEmbed[]> => {
         iconURL: sectionsData[2].authorIconUrl,
       })
       .setColor(sectionsData[2].colour),
-
-    new MessageEmbed()
-      .setDescription(statsData)
-      .setAuthor({
-        name: sectionsData[3].authorName,
-        iconURL: sectionsData[3].authorIconUrl,
-      })
-      .setColor(sectionsData[3].colour),
   ];
+
+  if (statsData !== '') {
+    messages.push(
+      new MessageEmbed()
+        .setDescription(statsData)
+        .setAuthor({
+          name: sectionsData[3].authorName,
+          iconURL: sectionsData[3].authorIconUrl,
+        })
+        .setColor(sectionsData[3].colour)
+    );
+  }
+
+  return messages;
 };
