@@ -12,6 +12,8 @@ export const DISCORD_REALTIME_CHANNEL_WEBHOOK_TOKEN = 'eee';
 export const DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID = 'fff';
 ```
 
+where `DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID` should be the message ID of a single message in a locked voice channel (i.e. create a message there first)
+
 ### Discord Bot
 
 #### Requirements
