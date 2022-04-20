@@ -259,7 +259,7 @@ export const getPrice = async (): Promise<string> => {
                     0
                   )} HVILLE; HVILLE ROI in **${Math.ceil(
                     e.floorPrice / priceHVILLEperONE / e.earningSpeed
-                  )} days**`
+                  )} days**)`
                 : ''
             }`
         )
