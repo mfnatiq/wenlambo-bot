@@ -284,7 +284,7 @@ export const getPrice = async (): Promise<string> => {
 30D Volume: **${numberWithCommas(
         (transactionValue30dOneCached / 1e3).toFixed(1)
       )}k** ONE = $${(transactionValue30dUsdCached / 1e3).toFixed(1)}K
-      Average Price Sold: **${avgPriceSoldOneCached.toFixed(2)}** ONE
+Average Price Sold: **${avgPriceSoldOneCached.toFixed(2)}** ONE
 Total Sold: **${numberWithCommas(numSoldCached.toString())}**
         `;
     }

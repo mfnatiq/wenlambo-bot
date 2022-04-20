@@ -81,13 +81,6 @@ export const updateRealtimeChannelPriceData = async (discordClient: Client) => {
                 embeds: embedMessage,
               });
 
-              const firstMessage = await webhook.send({
-                username: username,
-                avatarURL: avatarUrl,
-                embeds: embedMessage,
-              });
-              console.log(firstMessage.id);
-
               await new Promise((resolve) =>
                 setTimeout(resolve, 1000 * 60 * numMinutesCache)
               );
