@@ -249,9 +249,7 @@ export const getPrice = async (): Promise<string> => {
           (e) =>
             `**${e.earningSpeed}** HVILLE/day: **${e.count}** lambos${
               e.countListed > 0
-                ? ` (**${
-                    e.countListed
-                  }** listed; floor price **${e.floorPrice.toFixed(
+                ? ` (**${e.countListed}** listed; FP **${e.floorPrice.toFixed(
                     0
                   )}** ONE \\= $${(priceONEperUSD * e.floorPrice).toFixed(
                     0
