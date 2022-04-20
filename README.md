@@ -2,7 +2,7 @@
 
 ### Requirements
 
-1. Create a `secrets.ts` in the root folder with the following:
+1. Create a `secrets.ts` in the `src` folder with the following:
 
 ```
 export const DISCORD_BOT_TOKEN = 'bbb';

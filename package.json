@@ -14,7 +14,7 @@
     "@discordx/importer": "^1.1.2",
     "axios": "^0.26.1",
     "discord.js": "^13.6.0",
-    "discordx": "^9.1.12",
+    "discordx": "^9.5.2",
     "reflect-metadata": "^0.1.13",
     "ts-node": "^10.4.0",
     "web3": "^1.6.1"
