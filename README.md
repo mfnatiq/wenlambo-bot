@@ -18,14 +18,17 @@ where `DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID` should be the message ID of 
 
 #### Requirements
 
-1. [`discordx`](https://discord-ts.js.org/docs/installation): Version 16.6.0 or newer of Node.js is required
-2. OAuth2 discord bot settings: https://discord-ts.js.org/docs/decorators/commands/slash/
+1. Node.js v16.14.0
+
+#### Installation
+
+1. `npm i`
 
 #### Configuring Discord Bot
 
-1. See https://discord-ts.js.org/docs/decorators/commands/slash#authorize-your-bot-to-use-application-commands for authorising the bot
-2. See https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks for discord webhooks; create it for the specific (read-only) channel: first part is the webhook ID, second part is the webhook token
+1. See https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks for discord webhooks; create it for the specific (read-only) channel: first part is the webhook ID, second part is the webhook token
+2. Go to the Discord Developer Portal -> click on relevant application -> Bot -> enable all Privileged Gateway Intents
 
 ### Running the Application
 
-`yarn build` then `yarn start`
+`yarn build / npm run build` then `yarn start / npm start`
