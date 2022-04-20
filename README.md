@@ -10,6 +10,9 @@ export const DISCORD_REALTIME_CHANNEL_ID = 'ccc';    // channel should be a TEXT
 export const DISCORD_REALTIME_CHANNEL_WEBHOOK_ID = 'ddd';    // see below for getting this info from discord
 export const DISCORD_REALTIME_CHANNEL_WEBHOOK_TOKEN = 'eee';
 export const DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID = 'fff';
+
+export const BOT_DISPLAY_NAME = 'WenLambo Bot';
+export const BOT_AVATAR_URL = 'https://app.wenlambo.one/images/logo.png';
 ```
 
 where `DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID` should be the message ID of a single message in a locked voice channel (i.e. create a message there first)

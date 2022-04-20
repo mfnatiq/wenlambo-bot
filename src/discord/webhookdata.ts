@@ -21,11 +21,12 @@ import {
   DISCORD_REALTIME_CHANNEL_WEBHOOK_ID,
   DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID,
   DISCORD_REALTIME_CHANNEL_WEBHOOK_TOKEN,
+  BOT_DISPLAY_NAME,
+  BOT_AVATAR_URL,
 } from '../secrets';
 
-const username = 'MarsColony Data';
-const avatarUrl =
-  'https://aws1.discourse-cdn.com/standard17/uploads/marscolony/original/1X/73f77e8e1a03287b99217692129344d4441f8bf3.png';
+const username = BOT_DISPLAY_NAME || 'WenLambo Bot';
+const avatarUrl = BOT_AVATAR_URL || 'https://app.wenlambo.one/images/logo.png';
 
 interface SectionData {
   colour: ColorResolvable;
@@ -79,6 +80,13 @@ export const updateRealtimeChannelPriceData = async (discordClient: Client) => {
               webhook.editMessage(DISCORD_REALTIME_CHANNEL_WEBHOOK_MESSAGE_ID, {
                 embeds: embedMessage,
               });
+
+              const firstMessage = await webhook.send({
+                username: username,
+                avatarURL: avatarUrl,
+                embeds: embedMessage,
+              });
+              console.log(firstMessage.id);
 
               await new Promise((resolve) =>
                 setTimeout(resolve, 1000 * 60 * numMinutesCache)
