@@ -251,13 +251,15 @@ export const getPrice = async (): Promise<string> => {
               e.countListed > 0
                 ? ` (**${
                     e.countListed
-                  }** listed, floor price **${e.floorPrice.toFixed(
+                  }** listed; floor price **${e.floorPrice.toFixed(
                     0
                   )}** ONE \\= $${(priceONEperUSD * e.floorPrice).toFixed(
                     0
                   )} \\= ${(e.floorPrice / priceHVILLEperONE).toFixed(
                     0
-                  )} HVILLE)`
+                  )} HVILLE; HVILLE ROI in ${Math.ceil(
+                    e.floorPrice / priceHVILLEperONE / e.earningSpeed
+                  )} days`
                 : ''
             }`
         )
