@@ -93,41 +93,52 @@ export let earningSpeedsArr: PlotEarning[] = [];
         earningSpeedParam <= 30;
         earningSpeedParam++
       ) {
-        const res = await axios.post('https://nftkey.app/graphql', {
-          operationName: 'GetERC721TokenCountNew',
-          variables: {
-            input: {
-              collectionId: `${WenLamboNFT}_${harmonyChainId}`,
-              filters: {
-                traits: [{ type: 'Speed', values: [`${earningSpeedParam}`] }],
+        try {
+          const res = await axios.post('https://nftkey.app/graphql', {
+            operationName: 'GetERC721TokenCountNew',
+            variables: {
+              input: {
+                collectionId: `${WenLamboNFT}_${harmonyChainId}`,
+                filters: {
+                  traits: [{ type: 'Speed', values: [`${earningSpeedParam}`] }],
+                },
+                pageSize: maxLamboMintId + 1,
               },
-              pageSize: maxLamboMintId + 1,
             },
-          },
-          query:
-            'query GetERC721TokenCountNew($input: GetERC721TokensByCollectionIdInput!) {\n  erc721Tokens(input: $input) {\n    count\n    tokens {\n      tokenId\n      __typename\n    }\n    __typename\n  }\n}\n',
-        });
-
-        const respData = await res.data;
-        if (
-          respData['data'] &&
-          respData['data']['erc721Tokens'] &&
-          respData['data']['erc721Tokens']['count'] &&
-          respData['data']['erc721Tokens']['count'] > 0
-        ) {
-          earningSpeedsArrTemp.push({
-            earningSpeed: earningSpeedParam,
-            count: respData['data']['erc721Tokens']['count'],
-            countListed: 0,
-            floorPrice: 0,
+            query:
+              'query GetERC721TokenCountNew($input: GetERC721TokensByCollectionIdInput!) {\n  erc721Tokens(input: $input) {\n    count\n    tokens {\n      tokenId\n      __typename\n    }\n    __typename\n  }\n}\n',
           });
+
+          const respData = await res.data;
+          if (
+            respData['data'] &&
+            respData['data']['erc721Tokens'] &&
+            respData['data']['erc721Tokens']['count'] &&
+            respData['data']['erc721Tokens']['count'] > 0
+          ) {
+            earningSpeedsArrTemp.push({
+              earningSpeed: earningSpeedParam,
+              count: respData['data']['erc721Tokens']['count'],
+              countListed: 0,
+              floorPrice: 0,
+            });
+          }
+        } catch (error) {
+          console.log('earning speed', earningSpeedParam, 'error', error);
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // wait before retry if looping through listings fails
+          continue;
         }
       }
 
       // lambos for sale
-      const numListings: number = await nftkeysMarketplaceContract.methods
-        .numTokenListings(WenLamboNFT)
-        .call();
+      let numListings: number = 0;
+      try {
+        numListings = await nftkeysMarketplaceContract.methods
+          .numTokenListings(WenLamboNFT)
+          .call();
+      } catch (error) {
+        console.log('get numTokenListings error', error);
+      }
 
       let currBatchCount = 0;
       let startingIdx = 1 + currBatchCount * batchSizeLambos;
@@ -174,7 +185,7 @@ export let earningSpeedsArr: PlotEarning[] = [];
           currBatchCount++;
           startingIdx = 1 + currBatchCount * batchSizeLambos;
         } catch (error) {
-          console.log(error);
+          console.log('getTokenListings error', error);
           await new Promise((resolve) => setTimeout(resolve, 1000)); // wait before retry if looping through listings fails
           continue;
         }
