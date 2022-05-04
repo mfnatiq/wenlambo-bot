@@ -64,13 +64,13 @@ export let earningSpeedsArr: PlotEarning[] = [];
             'https://api.coingecko.com/api/v3/simple/price?ids=harmony&vs_currencies=usd'
           ),
           axios.get(
-            'https://api.coingecko.com/api/v3/simple/price?ids=harmonyville&vs_currencies=usd'
+            'https://api.dexscreener.io/latest/dex/pairs/harmony/0x63cd1cd3e3b5475ccf095b4dd1f7199dc77f5d1e'
           ),
         ])
         .then((respArr) => {
           priceONEperUSD = respArr[0].data['harmony']['usd'];
-          priceHVILLEperUSD = respArr[1].data['harmonyville']['usd'];
-          priceHVILLEperONE = priceHVILLEperUSD / priceONEperUSD;
+          priceHVILLEperUSD = respArr[1].data['pair']['priceUsd'];
+          priceHVILLEperONE = respArr[1].data['pair']['priceNative'];
         });
     } catch (error) {
       console.log('pricing error', error);
@@ -247,9 +247,7 @@ export const getPrice = async (): Promise<string> => {
   try {
     const priceResponse = `
 1 ONE \\= **$${priceONEperUSD.toFixed(3)}**
-1 HVILLE \\= **$${priceHVILLEperUSD.toFixed(
-      3
-    )}** \\= **${priceHVILLEperONE.toFixed(3)} ONE**
+1 HVILLE \\= **$${priceHVILLEperUSD}** \\= **${priceHVILLEperONE} ONE**
     `.trim();
 
     let earningSpeedResponse = '';
@@ -308,7 +306,8 @@ ${earningSpeedResponse}
 ${totalTransactionsResponse}`.trim();
 
     return response;
-  } catch {
+  } catch (e) {
+    console.log('fetch price error', e);
     return 'Fetching prices...';
   }
 };
